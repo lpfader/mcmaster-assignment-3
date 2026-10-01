@@ -6,12 +6,12 @@ import bookRoutes from "./books/book_routes";
 import { connectToDatabase } from "./db";
 
 const app = new Koa();
-qs(app);
+qs(app, "extended");
 
 app.use(cors());
 app.use(bodyParser());
-app.use(bookRoutes.allowedMethods());
 app.use(bookRoutes.routes());
+app.use(bookRoutes.allowedMethods());
 
 const PORT = 3000;
 

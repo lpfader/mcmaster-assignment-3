@@ -1,24 +1,36 @@
 import Router from "@koa/router";
-import type { Book } from "../../adapter/assignment-2";
+import type { Book } from "../../adapter/assignment-3";
 import { getDatabase } from "../db";
 
 const listRouter = new Router();
 
+interface RawFilter {
+    from?: string;
+    to?: string;
+    name?: string;
+    author?: string;
+}
+
+interface ParsedFilter {
+    from?: number;
+    to?: number;
+    name?: string;
+    author?: string;
+}
+
 listRouter.get("/books", async (ctx) => {
-    const filters = ctx.query.filters as Array<{ from?: string; to?: string }> | undefined;
+    const rawFilters = ctx.query.filters as RawFilter[] | undefined;
 
     try {
         let bookList = await getBooksFromDatabase();
 
-        if (filters && Array.isArray(filters) && filters.length > 0) {
-            if (!validateFilters(filters)) {
+        if (rawFilters && Array.isArray(rawFilters) && rawFilters.length > 0) {
+            const filters = parseFilters(rawFilters);
+            if (filters === null) {
                 ctx.status = 400;
-                ctx.body = {
-                    error: 'Invalid filters. Each filter must have valid "from" and "to" numbers where from <= to.',
-                };
+                ctx.body = { error: "Invalid filters." };
                 return;
             }
-
             bookList = filterBooks(bookList, filters);
         }
 
@@ -29,34 +41,46 @@ listRouter.get("/books", async (ctx) => {
     }
 });
 
-function validateFilters(filters: any): boolean {
-    // Check if filters exist and are an array
-    if (!filters || !Array.isArray(filters)) {
-        return false;
+function parseFilters(rawFilters: RawFilter[]): ParsedFilter[] | null {
+    const parsed: ParsedFilter[] = [];
+
+    for (const raw of rawFilters) {
+        const filter: ParsedFilter = {};
+
+        if (raw.from !== undefined) {
+            const from = parseFloat(raw.from);
+            if (isNaN(from)) return null;
+            filter.from = from;
+        }
+
+        if (raw.to !== undefined) {
+            const to = parseFloat(raw.to);
+            if (isNaN(to)) return null;
+            filter.to = to;
+        }
+
+        if (raw.name !== undefined) {
+            if (typeof raw.name !== "string" || raw.name.trim() === "") return null;
+            filter.name = raw.name;
+        }
+
+        if (raw.author !== undefined) {
+            if (typeof raw.author !== "string" || raw.author.trim() === "") return null;
+            filter.author = raw.author;
+        }
+
+        if (filter.from !== undefined && filter.to !== undefined && filter.from > filter.to) {
+            return null;
+        }
+
+        if (Object.keys(filter).length === 0) {
+            return null;
+        }
+
+        parsed.push(filter);
     }
 
-    // Check each filter object in the array
-    return filters.every((filter) => {
-        const from = filter.from !== undefined ? parseFloat(filter.from) : undefined;
-        const to = filter.to !== undefined ? parseFloat(filter.to) : undefined;
-
-        // If from is provided, it must be a valid number
-        if (from !== undefined && isNaN(from)) {
-            return false;
-        }
-
-        // If to is provided, it must be a valid number
-        if (to !== undefined && isNaN(to)) {
-            return false;
-        }
-
-        // If both are provided, from must be <= to
-        if (from !== undefined && to !== undefined && from > to) {
-            return false;
-        }
-
-        return true;
-    });
+    return parsed;
 }
 
 async function getBooksFromDatabase(): Promise<Book[]> {
@@ -72,17 +96,19 @@ async function getBooksFromDatabase(): Promise<Book[]> {
     }));
 }
 
-// Filter books by price range - a book matches if it falls within ANY of the filter ranges
-function filterBooks(bookList: Book[], filters: Array<{ from?: string; to?: string }>): Book[] {
+function filterBooks(bookList: Book[], filters: ParsedFilter[]): Book[] {
     return bookList.filter((book) =>
         filters.some((filter) => {
-            const from = filter.from !== undefined ? parseFloat(filter.from) : undefined;
-            const to = filter.to !== undefined ? parseFloat(filter.to) : undefined;
+            const matchesFrom = filter.from === undefined || book.price >= filter.from;
+            const matchesTo = filter.to === undefined || book.price <= filter.to;
+            const matchesName =
+                filter.name === undefined ||
+                book.name.toLowerCase().includes(filter.name.toLowerCase());
+            const matchesAuthor =
+                filter.author === undefined ||
+                book.author.toLowerCase().includes(filter.author.toLowerCase());
 
-            const matchesFrom = from === undefined || book.price >= from;
-            const matchesTo = to === undefined || book.price <= to;
-
-            return matchesFrom && matchesTo;
+            return matchesFrom && matchesTo && matchesName && matchesAuthor;
         }),
     );
 }
