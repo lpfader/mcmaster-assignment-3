@@ -13,7 +13,6 @@ export default tseslint.config(
             "playwright-report/**",
             "test-results/**",
             ".eslintcache",
-
         ],
     },
     js.configs.recommended,
@@ -29,10 +28,7 @@ export default tseslint.config(
         },
         rules: {
             "no-unused-vars": "off",
-            "@typescript-eslint/no-unused-vars": [
-                "warn",
-                { argsIgnorePattern: "^_" },
-            ],
+            "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
             "@typescript-eslint/no-explicit-any": "warn",
             "no-console": "off",
             "prefer-const": "warn",
